@@ -12,10 +12,6 @@ export const users = [
         type: 'varchar(255)'
     },
     {
-        name:'user_image',
-        type: 'varchar(255)'
-    },
-    {
         name:'usercountry',
         type: 'varchar(255)'
     },
@@ -27,10 +23,7 @@ export const users = [
         name:'userPassword',
         type: 'varchar(255)'
     },
-    {
-        name:'date_of_birth',
-        type: 'DATE'
-    }
+    
 ]
 
 export const Boats=[
