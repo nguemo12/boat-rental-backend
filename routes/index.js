@@ -1,6 +1,6 @@
-import { userRoute } from "./users";
-import { boatRoute } from "./boats";
-import { rentalRoute } from "./rental";
+import { userRoute } from "./users.js";
+import { boatRoute } from "./boats.js";
+import { rentalRoute } from "./rental.js";
 
 export const ROUTES = {
     users:userRoute,

@@ -1,19 +1,21 @@
-const Pool = require('pg').Pool
-import bcrypt from "bcryptjs";
+import mysql from 'mysql2/promise'
 import { credentials }  from './constants.js'
+import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-const pool = new Pool({
-    user:credentials.user,
-    host:credentials.host,
-    //database:credentials.database,
-    password:credentials.password,
-    port:credentials.port
+
+
+const db = await mysql.createConnection({
+    host: credentials.host,
+    user: credentials.user,
+    password: credentials.password,
+   // database: credentials.database
 });
 
+await db.connect()
 
 // function to create db and use it
 export async function createDatabase(dbname){
-   const createDB = await pool.query(`CREATE DATABASE IF NOT EXISTS ${dbname}`);
+   const createDB = await db.query(`CREATE DATABASE IF NOT EXISTS ${dbname}`);
    if(createDB[0].serverStatus ==2)
         return {
             ok: true,
@@ -28,7 +30,7 @@ export async function createDatabase(dbname){
 
 // function to access db
 export async function useDB(dbname){
-    const result = await pool.query(`USE ${dbname}`)
+    const result = await db.query(`USE ${dbname}`)
     if(result[0].stateChanges.schema == `${dbname}`)
         return{
             ok: true,
@@ -52,7 +54,7 @@ export async function useDB(dbname){
 export async function createTable(tableName,columns){
     tableName = tableName.toLocaleLowerCase()
     const column = synthesizeColumn(columns)
-    const result = await pool.query(`create table if not exists ${tableName} (id int SERIAL PRIMARY KEY, ${column})`)
+    const result = await db.query(`create table if not exists ${tableName} (id int primary key auto_increment, ${column})`)
     if(result[0].serverStatus==2){
         return{
             ok: true,
@@ -103,7 +105,7 @@ export async function findAll(tablename,select_columns=[],column_num=0,order_by=
     if(column_num>0)
         sql+=` limit ${column_num}` 
     
-    const [data] = await pool.query(sql)
+    const [data] = await db.query(sql)
     return {
         ok: true,
         data,
@@ -125,8 +127,8 @@ export async function find(tableName,fields,values,operator='AND'){
         operator = 'OR'
     }
 
-    let sql = `\d ${tableName}`;
-    let [res] = await pool.query(sql)
+    let sql = `DESCRIBE ${tableName}`;
+    let [res] = await db.query(sql)
     const db_columns = (()=> {let arr=[]; res.forEach(item=> arr.push(item.Field)); return arr; })()
     const isFieldExist = (()=> { let ok=true; fields.forEach(field=> { if(!db_columns.includes(field)){ ok=false; } }); return ok;})()
     const isValueNotNull = (()=>{
@@ -156,7 +158,7 @@ export async function find(tableName,fields,values,operator='AND'){
 
          sql +=str;
 
-        [res] = await pool.query(sql,values)
+        [res] = await db.query(sql,values)
         if(res.length>0)
             return{
                 ok: true,
@@ -190,7 +192,7 @@ export async function insert(table,columns=[],values=[[]]){
     let id = 0;
 
     if(columns.length===values[0]?.length){
-    let [res] = await pool.query(sql);
+    let [res] = await db.query(sql);
 
     // pk = {field: 'id',extra: yes || no (if it auto_increment)}
     const pk = getPrimaryKey(res)
@@ -234,7 +236,7 @@ export async function insert(table,columns=[],values=[[]]){
                     }
                  })
             }
-            res = await pool.query(sql,[values])
+            res = await db.query(sql,[values])
 
                if(res[0]?.affectedRows>=1 && res[0]?.serverStatus==2)
                     return {
@@ -278,7 +280,7 @@ export async function update(table,data,references={},operator='AND'){
     }
     let sql = `desc ${table}`;
 
-    let [res] = await pool.query(sql);
+    let [res] = await db.query(sql);
     // const db_columns = (()=> {let arr=[]; res.forEach(item=> arr.push(item.Field)); return arr; })()
     const pk = getPrimaryKey(res)
 
@@ -325,7 +327,7 @@ export async function update(table,data,references={},operator='AND'){
             values.push(references_values[0])
         }
 
-        res = await pool.query(sql,values)
+        res = await db.query(sql,values)
         dbData = await find(table,['id'],[data.id],'AND')
         
 
@@ -368,7 +370,7 @@ export async function deleteOne(table,field='',value){
     table = table.toLocaleLowerCase()
     let sql = `desc ${table}`;
 
-    let [res] = await pool.query(sql);
+    let [res] = await db.query(sql);
     const db_columns = (()=> {let arr=[]; res.forEach(item=> arr.push(item.Field)); return arr; })()
 
     const pk = getPrimaryKey(res)
@@ -397,7 +399,7 @@ export async function deleteOne(table,field='',value){
 
      sql = `delete from ${table} where ${field} = ?`
 
-     res = await pool.query(sql,value)
+     res = await db.query(sql,value)
      if(res[0].affectedRows>=1 && res[0].serverStatus==2){
         return{
             ok: true,
@@ -414,7 +416,7 @@ export async function deleteOne(table,field='',value){
 }
 
 export async function deleteAll(table){
-    const res = await pool.query(`delete from ${table}`)
+    const res = await db.query(`delete from ${table}`)
     if(res[0].affectedRows >=1){
         return{
             ok: true,
@@ -439,7 +441,7 @@ data = {
 */
 export async function search(table='',data={}){
     table = table.toLocaleLowerCase()
-    const [datas] = await pool.query(`SELECT * FROM ${table} where ${Object.keys(data)[0]} like ?`,['%' + Object.values(data)[0] + '%'])
+    const [datas] = await db.query(`SELECT * FROM ${table} where ${Object.keys(data)[0]} like ?`,['%' + Object.values(data)[0] + '%'])
     if(datas?.length >= 0){
         return{
             ok: true,
@@ -465,7 +467,7 @@ export async function paginate(table,from,to){
             from-=1
             to-=1
         }
-        const [data] = await pool.query(`select * from ${table} limit ?,?`,[from,to])
+        const [data] = await db.query(`select * from ${table} limit ?,?`,[from,to])
         if(data?.length >= 0){
             return{
                 ok: true,
@@ -490,7 +492,7 @@ export async function paginate(table,from,to){
 
 async function getLastId(table,pk){
     let sql = `select ${pk} from ${table} order by ${pk} desc limit 1`
-    const [res] = await pool.query(sql)
+    const [res] = await db.query(sql)
     let response = {
         ok: true,
         data: 0,

@@ -1,6 +1,5 @@
 import express from 'express';
 import cors from 'cors';
-import fs from 'fs'
 import { ROUTES } from './routes/index.js';
 import { createDatabase, useDB } from './db_connection.js';
 import { createAllTables } from './helpers/models.js';
